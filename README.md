@@ -1,117 +1,57 @@
-![CrowdStrike Logo](./docs/asset/cs-logo.png)
-
-[![Twitter URL](https://img.shields.io/twitter/url?label=Follow%20%40CrowdStrike&style=social&url=https%3A%2F%2Ftwitter.com%2FCrowdStrike)](https://twitter.com/CrowdStrike)<br/>
-
 # VirtualGHOST
 
-This repository contains a PowerShell script leveraging [VMWare PowerCLI](https://developer.broadcom.com/tools/vmware-powercli/latest) to identify unregistered VMWare Virtual Machines (VMs) that are powered on by comparing the list of VMs registered in the inventory (vCenter or ESXi) vs. those that are powered on.
+![CrowdStrike Logo](./docs/asset/cs-logo.png)
 
-## What is a VirtualGHOST?
+[![Twitter URL](https://img.shields.io/twitter/url?label=Follow%20%40CrowdStrike&style=social&url=https%3A%2F%2Ftwitter.com%2FCrowdStrike)](https://twitter.com/CrowdStrike)
 
-A "VirtualGHOST" is a VMWare Virtual Machine on an ESXi host that has been powered on manually from the command line. CrowdStrike decided to call this particular technique VirtualGHOST since it's a Virtual Machine whose presence is nearly impossible to detect.
+This repository contains tools developed by the CrowdStrike Professional Services team to detect the presence of "VirtualGHOSTs" in a VMware vSphere environment. A "VirtualGHOST" (or just Ghost) is a VMware Virtual Machine on an ESXi host that has been powered on manually from the command line. CrowdStrike decided to call this particular technique VirtualGHOST since it's a Virtual Machine whose presence is nearly impossible to detect. Some of the tooling will go beyond only searching for VirtualGHOSTs and will also review vCenter events for evidence of suspicious activity.
 
-## Usage
+## Tooling Compared
 
-`Detect-VirtualGHOST.ps1` is the PowerShell script that contains the detection logic. It expects two parameters:
-- Server (IP/DNS for vCenter or ESXi)
-- Credential (PowerShell credential object representing username/password with privileges to access VMWare management APIs)
+As CrowdStrike has continued to observe usage of the VirtualGHOST technique in the wild, multiple tools have been developed to assist with the identification of VirtualGHOST VMs. This table outlines some of the key differences of the tooling developed so far.
 
-If either of these parameters are not provided, the script will prompt for them. E.g.
+|Function / Feature|Detect-VirtualGHOST|GHOSTHUNTER|
+|----|----|----|
+|**Language**|PowerShell|Python|
+|**Target System(s)**|ESXi or vCenter|vCenter Only|
+|**Detect Running Ghost VMs**|:heavy_check_mark:|:wavy_dash: (Not specifically, but will see presence of it on the datastore)|
+|**Detect Ghost VMs Still Present On Datastore But Not Necessarily Running**|:x:|:heavy_check_mark:|
+|**Review vCenter Events for Suspicious Activity**|:x:|:heavy_check_mark:|
 
-```
-.\Detect-VirtualGHOST.ps1
+## Detect-VirtualGHOST (PowerShell)
 
-cmdlet Detect-VirtualGHOST.ps1 at command pipeline position 1
-Supply values for the following parameters:
-Server:
-```
+The original tool in this repository, [Detect-VirtualGHOST](Detect-VirtualGHOST.ps1), is a PowerShell script leveraging [VMware PowerCLI](https://developer.broadcom.com/tools/vmware-powercli/latest) to identify unregistered VMware Virtual Machines (VMs) that are powered on by comparing the list of VMs registered in the inventory (vCenter or ESXi) vs. those that are powered on.
 
-![PowerShell Credential Prompt](./docs/asset/PowerShellCredRequest.png)
+> [!WARNING]
+> CrowdStrike has observed Threat Actors attempting to masquerade their Ghost VMs as VMware vSphere Cluster Services VMs. These have names starting with the value `vCLS` with a dash separated randomly generated string. Be aware that vCLS VMs should **not** have a network interface attached.
 
-### Passed Credential Object
+Detailed guidance for execution & output interpretation is available [in the Detect-VirtualGHOST documentation](./docs/Detect-VirtualGHOST.md).
 
-```powershell
-$Credential = Get-Credential
-.\Detect-VirtualGHOST.ps1 -Credential $Credential
-```
+## GHOSTHUNTER (Python)
 
-## Tested VMWare Versions
+CrowdStrike has developed a Python script that leverages [pyVmomi](https://github.com/vmware/pyvmomi/tree/master) (the Python SDK for the VMware vSphere Management API) to triage vCenter Servers for signs of suspicious activity. It is designed to complement the original PowerShell script that CrowdStrike previously created to identify the presence of VirtualGHOST VMs.
 
-- vCenter 
-  - 8.0.2
-- ESXi
-  - 6.5.0
-  - 7.0.3
-  - 8.0.0
+The script was tested using Python 3.13 against vCenter 8. It requires two Python modules which can be installed
+using Python's default package manager pip:
 
-## Sample Output
+- requests
+- pyvmomi
 
-### Positive Result Requiring Further Investigation
-
-```
-.\Detect-VirtualGHOST.ps1 -Server 192.168.122.20 -Credential $Credential
-[+] Importing VMWare PowerCLI module. Please wait as this might take a while...
-[+] Connecting to Server: 192.168.122.20
-[+] Connected to server: 192.168.122.20
-[+] There are 2 hypervisors that will be checked for evidence of VirtualGHOST VMs.
-WARNING: [!] ====Unregistered VM Detected on 192.168.122.52====
-WARNING:
-Hypervisor     VMName   VMConfigFile                                                            VMWorldID
-----------     ------   ------------                                                            ---------
-192.168.122.52 OpenWrt4 /vmfs/volumes/663a5dbf-a8d1533e-7af4-000c29d0e331/OpenWrt4/OpenWrt4.vmx 265959
-
-
-WARNING: [!] ====Unregistered VM Detected on 192.168.122.53====
-WARNING:
-Hypervisor     VMName   VMConfigFile                                                            VMWorldID
-----------     ------   ------------                                                            ---------
-192.168.122.53 OpenWrt2 /vmfs/volumes/663a5daa-3740eb00-3ac0-000c296d56a6/OpenWrt2/OpenWrt2.vmx 265222
-
-
-WARNING: This VM appears to be connected to the network(s): VM Network
-WARNING:
-ActiveFilters DVPortID IPAddress MACAddress        PortID    Portgroup  TeamUplink UplinkPortID vSwitch
-------------- -------- --------- ----------        ------    ---------  ---------- ------------ -------
-                       0.0.0.0   00:00:00:00:00:00 134217741 VM Network void       0            vSwitch0
-
-
-WARNING:
-Hypervisor     VMName   VMConfigFile                                                            VMWorldID
-----------     ------   ------------                                                            ---------
-192.168.122.53 OpenWrt5 /vmfs/volumes/663a5daa-3740eb00-3ac0-000c296d56a6/OpenWrt5/OpenWrt5.vmx 266726
-
-
-WARNING: This VM appears to be connected to the network(s): dvportgroup-20
-WARNING:
-ActiveFilters DVPortID IPAddress MACAddress        PortID    Portgroup      TeamUplink UplinkPortID vSwitch
-------------- -------- --------- ----------        ------    ---------      ---------- ------------ -------
-              1        0.0.0.0   00:50:56:98:6f:04 100663310 dvportgroup-20 vmnic1     2248146951   SwitchNetwork
-
-
-WARNING: [!] Unregistered VMs detected on at least one hypervisor. Please refer to the output above. There may be some false positives due to standard system lifecycles, but any results should be investigated further.
-```
-
-### Negative Result - No Potential VirtualGHOST VMs Detected
-
-```
-.\Detect-VirtualGHOST.ps1 -Server 192.168.122.20 -Credential $Credential
-[+] Importing VMWare PowerCLI module. Please wait as this might take a while...
-[+] Connecting to server: 192.168.122.20
-[+] Connected to server: 192.168.122.20 | Version: 8.0.2 | ProductLine: vpx
-[+] There are 2 hypervisors that will be checked for evidence of VirtualGHOST VMs.
-[+] No unregistered VMs detected.
-```
+Detailed guidance for execution & output interpretation is available [in the GHOSTHUNTER documentation](./docs/GHOSTHUNTER.md).
 
 ## Next Steps
 
-### Imaging / Investigation
-Because the VirtualGHOST is not in the VM inventory, it cannot be managed by standard VMWare processes like vCenter or the ESXi web UI. To collect a forensic image and VM log files, follow these steps:
+If a VirtualGHOST is identified, the team should attempt to collect a forensic image as soon as possible. CrowdStrike has observed Threat Actors leveraging this technique to regularly delete the Ghost VM as soon as it is no longer actively being used.
+
+### Imaging / Investigation of a VirtualGHOST
+
+Because the VirtualGHOST is not in the VM inventory, it cannot be managed by standard VMware processes like vCenter or the ESXi web UI. To collect a forensic image and VM log files of a running VirtualGHOST, follow these steps:
 
 - Enable SSH on the ESXi host with the VirtualGHOST VM (this is required because the Datastore browser may not allow you to copy all of the files related to the VirtualGHOST as some of them will be locked)
 - Connect to the ESXi host over SSH
 - Copy all files in the VirtualGHOST's directory to a different location (understanding that some files will be locked)
   - Typically there is only one Virtual Machine definition (`.vmx`) file per directory - so navigate to the parent directory of the `VMConfigFile` returned by the detection script
-- Register VM in ESXi UI using standard Create/Register VM interface ([Documentation Link](https://knowledge.broadcom.com/external/article?legacyId=1006160))
+- Register running VirtualGHOST VM in ESXi UI using standard Create/Register VM interface ([Documentation Link](https://knowledge.broadcom.com/external/article?legacyId=1006160))
 - Open newly registered VM in ESXi web UI
 - Expand all VM menus and capture screenshots for investigative purposes (this can make the job of mapping back specific VM configurations easier)
 - Suspend newly registered VM via ESXi web UI

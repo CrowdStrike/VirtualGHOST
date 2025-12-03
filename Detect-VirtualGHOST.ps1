@@ -1,9 +1,9 @@
 #Requires -Version 3
 <#
 .SYNOPSIS
-    Identify unregistered VMWare Virtual Machines running on ESXi hypervisors
+    Identify unregistered VMware Virtual Machines running on ESXi hypervisors
 .DESCRIPTION
-    PowerShell script to identify unregistered VMWare Virtual Machines (VMs) that are powered on by comparing the list of VMs registered in the inventory (vCenter or ESXi) vs. those that are powered on via PowerCLI. Matching is performed by examining the 128-bit SMBIOS UUID of a virtual machine. Using the identifier should prevent situations where a duplicate VM Displayname is used to blend in. This particular technique has been given the name "VirtualGHOST" since it's a Virtual Machine whose presence is nearly impossible to detect.
+    PowerShell script to identify unregistered VMware Virtual Machines (VMs) that are powered on by comparing the list of VMs registered in the inventory (vCenter or ESXi) vs. those that are powered on via PowerCLI. Matching is performed by examining the 128-bit SMBIOS UUID of a virtual machine. Using the identifier should prevent situations where a duplicate VM Displayname is used to blend in. This particular technique has been given the name "VirtualGHOST" since it's a Virtual Machine whose presence is nearly impossible to detect.
 .PARAMETER Server
     Name/IP of vCenter or ESXi system to connect to with PowerCLI. When connecting to vCenter, the script will automatically loop through each registered hypervisor and perform the comparison. Alternatively, users can connect to a single ESXi system to check just that host.
 .PARAMETER Credential
@@ -34,7 +34,7 @@ if (-not (Get-Module -ListAvailable -Name VMware.PowerCLI)) {
     exit 1
 } else {
     # Importing only the Cmdlets that we need in the hopes of this finishing a bit faster (PowerCLI import is notoriously slow)
-    Write-Output "[+] Importing VMWare PowerCLI module. Please wait as this might take a while..."
+    Write-Output "[+] Importing VMware PowerCLI module. Please wait as this might take a while..."
     $null = Import-Module VMware.PowerCLI -Cmdlet Connect-VIServer, Get-EsxCli, Get-VMHost, Get-VM
 }
 
@@ -77,7 +77,7 @@ $ErrorActionPreference = "Stop"
 
 try {
     Write-Output "[+] Connecting to server: $Server"
-    $VMWareConnection = Connect-VIServer -Credential $Credential -Server $Server 
+    $VMwareConnection = Connect-VIServer -Credential $Credential -Server $Server 
 }
 catch {
     # Unable to connect to the server
@@ -94,7 +94,7 @@ catch {
     exit 1
 }
 # Display message indicating successful connection to the server. Includes version / product information for debugging if necessary
-Write-Output "[+] Connected to server: $($VMWareConnection.Name) | Version: $($VMWareConnection.Version) | ProductLine: $($VMWareConnection.ProductLine)"
+Write-Output "[+] Connected to server: $($VMwareConnection.Name) | Version: $($VMwareConnection.Version) | ProductLine: $($VMwareConnection.ProductLine)"
 
 $AllvmHosts = Get-VMHost
 Write-Output "[+] There are $($AllvmHosts.Length) hypervisor(s) that will be checked for evidence of VirtualGHOST VMs."
